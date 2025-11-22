@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "kaspa-portfolio-tracker"
+version = "0.1.0"
+description = "Kaspa Portfolio Tracker - Real-time portfolio tracking for Kaspa cryptocurrency"
+authors = ["Your Name <a@gmail.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.9.7 || >3.9.7,<4.0"
+streamlit = "^1.28.0"
+pandas = "^2.0.0"
+requests = "^2.32.5"
+plotly = "^6.5.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
