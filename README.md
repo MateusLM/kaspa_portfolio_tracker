@@ -137,7 +137,20 @@ The application intelligently manages historical price data:
 
 > **💡 Tip:** For transactions older than 365 days, place a `kaspa_report.xlsx` file in the project directory with a sheet named "kas price" containing columns: `Date` and `Kas Price`
 
-### API Endpoints
+### Secrets Management
+ 
+ To securely manage your API keys (e.g., for CoinStats), use Streamlit's secrets management:
+ 
+ 1. Create a file named `.streamlit/secrets.toml` in the project root.
+ 2. Add your API key to the file:
+ 
+ ```toml
+ COINSTATS_API_KEY = "your_api_key_here"
+ ```
+ 
+ > **Note:** The `.streamlit/` directory is added to `.gitignore` to prevent accidental commits of your secrets.
+ 
+ ### API Endpoints
 
 #### Kaspa API
 - **Endpoint:** `https://api.kaspa.org/addresses/{address}/full-transactions`

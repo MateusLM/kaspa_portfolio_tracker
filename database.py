@@ -11,16 +11,25 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS kaspa_prices (
             date TEXT PRIMARY KEY,
-            price REAL
+            price REAL,
+            price_eur REAL
         )
     ''')
+    
+    # Migration: Add price_eur column if it doesn't exist
+    cursor.execute("PRAGMA table_info(kaspa_prices)")
+    columns = [info[1] for info in cursor.fetchall()]
+    if "price_eur" not in columns:
+        cursor.execute("ALTER TABLE kaspa_prices ADD COLUMN price_eur REAL")
+        
     conn.commit()
     conn.close()
 
 def get_prices_from_db(start_date, end_date):
     """Retrieves prices from the database within a date range."""
     conn = sqlite3.connect(DB_NAME)
-    query = "SELECT date, price FROM kaspa_prices WHERE date >= ? AND date <= ?"
+    # Select both prices
+    query = "SELECT date, price, price_eur FROM kaspa_prices WHERE date >= ? AND date <= ?"
     df = pd.read_sql_query(query, conn, params=(start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")))
     conn.close()
     
@@ -29,7 +38,7 @@ def get_prices_from_db(start_date, end_date):
     return df
 
 def save_prices_to_db(price_data):
-    """Saves a list of (date, price) tuples or a DataFrame to the database."""
+    """Saves a list of (date, price, price_eur) tuples or a DataFrame to the database."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
@@ -47,16 +56,32 @@ def save_prices_to_db(price_data):
             
             # Ensure price is float
             try:
-                p = float(row['price'])
+                p_usd = float(row['price'])
             except:
-                continue # Skip invalid prices
+                p_usd = None
+            
+            try:
+                p_eur = float(row.get('price_eur')) if pd.notnull(row.get('price_eur')) else None
+            except:
+                p_eur = None
                 
-            data_to_insert.append((d, p))
+            if p_usd is not None or p_eur is not None:
+                data_to_insert.append((d, p_usd, p_eur))
     else:
+        # Expecting list of (date, price_usd, price_eur)
         data_to_insert = price_data
 
+    # Use UPSERT logic (SQLite 3.24+) to update existing records if we have new info (e.g. adding EUR to existing USD)
+    # But standard INSERT OR IGNORE ignores updates.
+    # We want to update if we have new data.
+    # Let's use INSERT OR REPLACE? No, that deletes and re-inserts.
+    # Let's use ON CONFLICT DO UPDATE
+    
     cursor.executemany('''
-        INSERT OR IGNORE INTO kaspa_prices (date, price) VALUES (?, ?)
+        INSERT INTO kaspa_prices (date, price, price_eur) VALUES (?, ?, ?)
+        ON CONFLICT(date) DO UPDATE SET
+            price = COALESCE(excluded.price, price),
+            price_eur = COALESCE(excluded.price_eur, price_eur)
     ''', data_to_insert)
     
     conn.commit()
@@ -83,6 +108,29 @@ def get_missing_dates(start_date, end_date):
             missing.append(d)
             
     return missing
+
+def get_dates_missing_currency(start_date, end_date, currency="eur"):
+    """Identifies dates where the specified currency price is missing (NULL)."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    col_name = "price_eur" if currency == "eur" else "price"
+    
+    # We want dates that exist in the DB but have NULL for the currency
+    # OR dates that don't exist at all (though get_missing_dates handles the latter, 
+    # this function focuses on "we have a row but missing this specific price")
+    # Actually, let's just return dates in range where col is NULL or row missing.
+    
+    # But for efficiency, let's just find rows where date is in range AND col IS NULL
+    query = f"SELECT date FROM kaspa_prices WHERE date >= ? AND date <= ? AND {col_name} IS NULL"
+    cursor.execute(query, (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")))
+    
+    missing_dates = []
+    for row in cursor.fetchall():
+        missing_dates.append(pd.to_datetime(row[0]))
+        
+    conn.close()
+    return missing_dates
 
 def import_prices_from_excel(file_path):
     """Imports price data from the 'kas price' sheet of an Excel file."""
