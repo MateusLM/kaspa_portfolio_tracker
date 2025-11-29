@@ -44,7 +44,7 @@ poetry.lock
 *.db
 *.sqlite
 *.sqlite3
-kaspa_data.db
+
 
 # Excel files (optional - uncomment if you don't want to track Excel files)
 # *.xlsx
