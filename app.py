@@ -517,6 +517,101 @@ if generate_btn or address_input:
                             )
                             st.plotly_chart(fig_bal, use_container_width=True)
                             
+                            # Profit/Loss Chart
+                            st.subheader("Profit/Loss Over Time")
+                            
+                            # Calculate historical P/L for each transaction
+                            df_pl = df.copy().fillna(0)
+                            
+                            # Calculate cumulative cost basis at each point
+                            df_pl['Inflow_Value'] = df_pl['Received Amount'] * df_pl['Price (Display)']
+                            df_pl['Outflow_Value'] = df_pl['Sent Amount'] * df_pl['Price (Display)']
+                            df_pl['Cumulative_Cost'] = (df_pl['Inflow_Value'] - df_pl['Outflow_Value']).cumsum()
+                            
+                            # P/L = Current Value - Cost Basis
+                            df_pl['Profit_Loss'] = df_pl['Value (Display)'] - df_pl['Cumulative_Cost']
+                            
+                            # Create the chart
+                            fig_pl = go.Figure()
+                            
+                            # Color the line based on positive/negative
+                            colors = ['green' if x >= 0 else 'red' for x in df_pl['Profit_Loss']]
+                            
+                            fig_pl.add_trace(go.Scatter(
+                                x=df_pl["Date"], 
+                                y=df_pl["Profit_Loss"], 
+                                mode='lines',
+                                name=f'P/L ({currency_select})',
+                                line=dict(color='blue', width=2),
+                                fill='tozeroy',
+                                fillcolor='rgba(0,100,255,0.2)'
+                            ))
+                            
+                            # Add a zero line for reference
+                            fig_pl.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+                            
+                            fig_pl.update_layout(
+                                yaxis=dict(title=f"Profit/Loss ({currency_select})"),
+                                xaxis=dict(title="Date"),
+                                hovermode='x unified'
+                            )
+                            
+                            st.plotly_chart(fig_pl, use_container_width=True)
+                            
+                            # Average Buy Price Over Time Chart
+                            st.subheader("Average Buy Price Over Time")
+                            
+                            # Calculate running average buy price
+                            df_avg = df.copy().fillna(0)
+                            
+                            # Track cumulative inflows and total KAS received
+                            df_avg['Inflow_Value'] = df_avg['Received Amount'] * df_avg['Price (Display)']
+                            df_avg['Cumulative_Inflow'] = df_avg['Inflow_Value'].cumsum()
+                            df_avg['Cumulative_Received'] = df_avg['Received Amount'].cumsum()
+                            
+                            # Calculate average buy price (avoid division by zero)
+                            df_avg['Avg_Buy_Price'] = df_avg.apply(
+                                lambda row: row['Cumulative_Inflow'] / row['Cumulative_Received'] 
+                                if row['Cumulative_Received'] > 0 else 0, 
+                                axis=1
+                            )
+                            
+                            # Create the chart
+                            fig_avg = go.Figure()
+                            
+                            # Add average buy price line
+                            fig_avg.add_trace(go.Scatter(
+                                x=df_avg["Date"], 
+                                y=df_avg["Avg_Buy_Price"], 
+                                mode='lines',
+                                name=f'Avg Buy Price ({currency_select})',
+                                line=dict(color='purple', width=2)
+                            ))
+                            
+                            # Add current price line for comparison
+                            fig_avg.add_trace(go.Scatter(
+                                x=df_avg["Date"], 
+                                y=df_avg["Price (Display)"], 
+                                mode='lines',
+                                name=f'Market Price ({currency_select})',
+                                line=dict(color='orange', width=2, dash='dot')
+                            ))
+                            
+                            fig_avg.update_layout(
+                                yaxis=dict(title=f"Price ({currency_select})"),
+                                xaxis=dict(title="Date"),
+                                hovermode='x unified',
+                                legend=dict(
+                                    orientation="h",
+                                    yanchor="bottom",
+                                    y=1.02,
+                                    xanchor="right",
+                                    x=1
+                                )
+                            )
+                            
+                            st.plotly_chart(fig_avg, use_container_width=True)
+                            
                             # Data Table
                             st.subheader("Transaction History")
                             # Show display columns in table
